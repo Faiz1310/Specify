@@ -3,177 +3,231 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Speech-to-Text Converter</title>
+    <title>Text-to-Speech Converter</title>
     <style>
         body {
-            font-family: sans-serif;
-            margin: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
             text-align: center;
-            background-color: #f4f7f6;
+            background-color: #e9eef2;
             color: #333;
         }
         .container {
-            max-width: 800px;
-            margin: 0 auto;
+            max-width: 600px;
+            margin: 40px auto;
             padding: 30px;
-            background-color: #fff;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
         }
         h1 {
             color: #007bff;
-            margin-bottom: 30px;
-        }
-        .section {
-            margin-top: 40px;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            background-color: #fafafa;
-        }
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
-            border: none;
-            border-radius: 5px;
-            transition: background-color 0.3s;
-        }
-        #recordButton {
-            background-color: #28a745;
-            color: white;
-        }
-        #recordButton:hover {
-            background-color: #218838;
-        }
-        #uploadButton {
-            background-color: #ffc107;
-            color: #333;
-        }
-        #uploadButton:hover {
-            background-color: #e0a800;
+            margin-bottom: 25px;
+            font-size: 28px;
         }
         textarea {
             width: 100%;
-            min-height: 150px;
+            min-height: 180px;
             padding: 15px;
-            margin-top: 15px;
+            margin-bottom: 20px;
             box-sizing: border-box;
             border: 1px solid #ccc;
-            border-radius: 5px;
+            border-radius: 8px;
             resize: vertical;
+            font-size: 16px;
         }
-        .status {
-            margin-top: 10px;
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        select, input[type="range"] {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            font-size: 16px;
+        }
+        .control-group {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+        .control-group label {
+            flex-basis: 30%;
+            text-align: left;
+            font-weight: 600;
+        }
+        .control-group span {
+            flex-basis: 10%;
+            text-align: right;
+            font-size: 14px;
+        }
+        button {
+            padding: 12px 25px;
+            font-size: 18px;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            transition: background-color 0.3s, transform 0.1s;
+            background-color: #28a745;
+            color: white;
             font-weight: bold;
+        }
+        button:hover {
+            background-color: #218838;
+            transform: translateY(-1px);
+        }
+        button:disabled {
+            background-color: #90ee90;
+            cursor: not-allowed;
+        }
+        .status-message {
+            margin-top: 15px;
+            font-size: 15px;
+            color: #dc3545;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎙️ Speech-to-Text Converter</h1>
+        <h1>🗣️ Text-to-Speech Generator</h1>
 
-        <div class="section">
-            <h2>1. Record Your Speech (Microphone)</h2>
-            <p>Use your device's microphone for real-time transcription.</p>
-            <button id="recordButton">Start Recording</button>
-            <div class="status" id="recordStatus">Click "Start Recording"</div>
-        </div>
+        <textarea id="text-input" placeholder="Enter the text you want to convert to speech..." rows="8">Hello! I am a web page hosted on GitHub. Use the controls below to select a voice and adjust the speed and pitch before clicking 'Listen'.</textarea>
 
-        <div class="section">
-            <h2>2. Upload an Audio File (MP3, WAV, etc.)</h2>
-            <p><strong>Note:</strong> File upload requires a **backend service** (like Google Speech API, Azure Cognitive Services) or a **serverless function** to process the audio file. This HTML/JS setup only handles the file selection.</p>
-            <input type="file" id="audioFile" accept="audio/*">
-            <button id="uploadButton" disabled>Convert Uploaded File</button>
+        <div class="controls">
+            <div class="control-group">
+                <label for="voice-select">Voice:</label>
+                <select id="voice-select" disabled></select>
+            </div>
+
+            <div class="control-group">
+                <label for="rate-range">Speed (Rate):</label>
+                <input type="range" id="rate-range" min="0.5" max="2" value="1" step="0.1">
+                <span id="rate-value">1.0</span>
+            </div>
+
+            <div class="control-group">
+                <label for="pitch-range">Pitch:</label>
+                <input type="range" id="pitch-range" min="0" max="2" value="1" step="0.1">
+                <span id="pitch-value">1.0</span>
+            </div>
         </div>
         
-        <hr>
-
-        <div class="section">
-            <h2>Converted Text Result</h2>
-            <textarea id="resultText" readonly placeholder="Your transcribed text will appear here..."></textarea>
-        </div>
+        <button id="listen-button">🔊 Listen</button>
+        <div class="status-message" id="status-message"></div>
     </div>
 
     <script>
-        const recordButton = document.getElementById('recordButton');
-        const recordStatus = document.getElementById('recordStatus');
-        const resultText = document.getElementById('resultText');
+        const synth = window.speechSynthesis;
+        const textInput = document.getElementById('text-input');
+        const voiceSelect = document.getElementById('voice-select');
+        const rateRange = document.getElementById('rate-range');
+        const rateValue = document.getElementById('rate-value');
+        const pitchRange = document.getElementById('pitch-range');
+        const pitchValue = document.getElementById('pitch-value');
+        const listenButton = document.getElementById('listen-button');
+        const statusMessage = document.getElementById('status-message');
+        
+        let voices = [];
 
-        // Check for Web Speech API support
-        if (!('webkitSpeechRecognition' in window)) {
-            recordStatus.textContent = '❌ Web Speech API not supported in this browser. Try Chrome or Edge.';
-            recordButton.disabled = true;
-        } else {
-            const recognition = new webkitSpeechRecognition();
-            recognition.continuous = true; // Keep listening after a pause
-            recognition.interimResults = true; // Show results as they are being spoken
-            recognition.lang = 'en-US'; // Set default language
+        // --- Voice Initialization ---
+        function populateVoiceList() {
+            voices = synth.getVoices().sort((a, b) => {
+                const aname = a.name.toUpperCase();
+                const bname = b.name.toUpperCase();
+                if (aname < bname) return -1;
+                if (aname > bname) return +1;
+                return 0;
+            });
 
-            let isRecording = false;
+            voiceSelect.innerHTML = ''; // Clear previous options
+            if (voices.length === 0) {
+                 statusMessage.textContent = '⚠️ No voices available. Check browser settings.';
+                 return;
+            }
 
-            recordButton.onclick = () => {
-                if (!isRecording) {
-                    // Start recording
-                    recognition.start();
-                    recordButton.textContent = 'Stop Recording';
-                    recordButton.style.backgroundColor = '#dc3545'; // Red for stopping
-                    recordStatus.textContent = '🟢 Listening... Speak now.';
-                    isRecording = true;
-                    resultText.value = ''; // Clear previous text
-                } else {
-                    // Stop recording
-                    recognition.stop();
-                    recordButton.textContent = 'Start Recording';
-                    recordButton.style.backgroundColor = '#28a745'; // Green for starting
-                    recordStatus.textContent = '⏸️ Recording stopped.';
-                    isRecording = false;
+            for (let i = 0; i < voices.length; i++) {
+                const option = document.createElement('option');
+                option.textContent = `${voices[i].name} (${voices[i].lang})`;
+                
+                // Select a default voice (e.g., English)
+                if (voices[i].default) {
+                    option.selected = true;
                 }
-            };
-
-            recognition.onresult = (event) => {
-                let final_transcript = '';
-                let interim_transcript = '';
-
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) {
-                        final_transcript += event.results[i][0].transcript;
-                    } else {
-                        interim_transcript += event.results[i][0].transcript;
-                    }
-                }
-                // Displaying both final and interim results
-                resultText.value = final_transcript + interim_transcript;
-            };
-
-            recognition.onerror = (event) => {
-                recordStatus.textContent = `⚠️ Error: ${event.error}. Try granting microphone permission.`;
-                recordButton.textContent = 'Start Recording';
-                recordButton.style.backgroundColor = '#28a745';
-                isRecording = false;
-                console.error('Speech recognition error:', event.error);
-            };
-
-            recognition.onend = () => {
-                if (isRecording) {
-                    // Automatically restart if it stops unexpectedly while still "recording"
-                    // recognition.start(); // Commented out to allow explicit stop
-                } else {
-                    recordStatus.textContent = 'Click "Start Recording"';
-                }
-            };
+                option.setAttribute('data-lang', voices[i].lang);
+                option.setAttribute('data-name', voices[i].name);
+                voiceSelect.appendChild(option);
+            }
+            voiceSelect.disabled = false;
         }
 
-        // Placeholder for the file upload functionality
-        document.getElementById('audioFile').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                // In a real application, you would send this file to a server-side API (e.g., using fetch())
-                document.getElementById('uploadButton').disabled = false;
-                resultText.value = `File selected: ${file.name}. \n\nTo complete the conversion for this file, you need a powerful server-side Speech-to-Text API (e.g., Google Cloud, AWS Transcribe).`;
-            } else {
-                document.getElementById('uploadButton').disabled = true;
-                resultText.value = '';
+        // Browsers often load voices asynchronously, so we wait for the event
+        populateVoiceList();
+        if (synth.onvoiceschanged !== undefined) {
+            synth.onvoiceschanged = populateVoiceList;
+        }
+
+        // --- Speech Synthesis Function ---
+        function speak() {
+            if (synth.speaking) {
+                synth.cancel(); // Stop any current speech
+            }
+
+            const text = textInput.value.trim();
+            if (text === '') {
+                statusMessage.textContent = '❌ Please enter some text to synthesize.';
+                return;
+            }
+            
+            statusMessage.textContent = '';
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            
+            // Set parameters
+            const selectedOption = voiceSelect.selectedOptions[0].getAttribute('data-name');
+            utterance.voice = voices.find(voice => voice.name === selectedOption) || voices[0];
+            utterance.rate = parseFloat(rateRange.value);
+            utterance.pitch = parseFloat(pitchRange.value);
+
+            // Event listeners for status updates
+            utterance.onstart = () => {
+                listenButton.textContent = '... Speaking';
+                listenButton.disabled = true;
+            };
+            
+            utterance.onend = () => {
+                listenButton.textContent = '🔊 Listen';
+                listenButton.disabled = false;
+            };
+
+            utterance.onerror = (event) => {
+                listenButton.textContent = '🔊 Listen';
+                listenButton.disabled = false;
+                statusMessage.textContent = `❌ Speech error: ${event.error}`;
+            };
+            
+            synth.speak(utterance);
+        }
+
+        // --- Event Listeners ---
+        listenButton.addEventListener('click', speak);
+
+        rateRange.addEventListener('input', () => {
+            rateValue.textContent = rateRange.value;
+        });
+
+        pitchRange.addEventListener('input', () => {
+            pitchValue.textContent = pitchRange.value;
+        });
+        
+        // Allow pressing Enter to listen
+        textInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                speak();
             }
         });
 
