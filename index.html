@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Text-to-Speech Converter</title>
+    <title>SpeakSync: Text-to-Speech Converter</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -30,7 +30,7 @@
             width: 100%;
             min-height: 180px;
             padding: 15px;
-            margin-bottom: 20px;
+            margin-bottom: 5px; /* Adjusted margin */
             box-sizing: border-box;
             border: 1px solid #ccc;
             border-radius: 8px;
@@ -65,23 +65,39 @@
             text-align: right;
             font-size: 14px;
         }
-        button {
-            padding: 12px 25px;
-            font-size: 18px;
+        .action-buttons button {
+            padding: 12px 15px;
+            font-size: 16px;
             cursor: pointer;
             border: none;
             border-radius: 8px;
             transition: background-color 0.3s, transform 0.1s;
+            font-weight: bold;
+            flex-grow: 1;
+        }
+        #listen-button {
             background-color: #28a745;
             color: white;
-            font-weight: bold;
         }
-        button:hover {
+        #listen-button:hover {
             background-color: #218838;
-            transform: translateY(-1px);
+        }
+        #pause-button {
+            background-color: #ffc107;
+            color: #333;
+        }
+        #pause-button:hover:not(:disabled) {
+            background-color: #e0a800;
+        }
+        #resume-button {
+            background-color: #17a2b8;
+            color: white;
+        }
+        #resume-button:hover:not(:disabled) {
+            background-color: #138496;
         }
         button:disabled {
-            background-color: #90ee90;
+            opacity: 0.6;
             cursor: not-allowed;
         }
         .status-message {
@@ -89,13 +105,23 @@
             font-size: 15px;
             color: #dc3545;
         }
+        .char-counter {
+            text-align: right; 
+            margin-bottom: 15px; 
+            font-size: 14px; 
+            color: #666;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🗣️ Text-to-Speech Generator</h1>
+        <h1>🗣️ SpeakSync (Text-to-Speech Generator)</h1>
 
         <textarea id="text-input" placeholder="Enter the text you want to convert to speech..." rows="8">Hello! I am a web page hosted on GitHub. Use the controls below to select a voice and adjust the speed and pitch before clicking 'Listen'.</textarea>
+        
+        <div class="char-counter">
+            Characters: <span id="char-count">0</span>
+        </div>
 
         <div class="controls">
             <div class="control-group">
@@ -116,7 +142,12 @@
             </div>
         </div>
         
-        <button id="listen-button">🔊 Listen</button>
+        <div class="action-buttons" style="display: flex; gap: 10px; justify-content: center;">
+            <button id="listen-button">🔊 Listen</button>
+            <button id="pause-button" disabled>⏸️ Pause</button>
+            <button id="resume-button" disabled>▶️ Resume</button>
+        </div>
+
         <div class="status-message" id="status-message"></div>
     </div>
 
@@ -129,7 +160,10 @@
         const pitchRange = document.getElementById('pitch-range');
         const pitchValue = document.getElementById('pitch-value');
         const listenButton = document.getElementById('listen-button');
+        const pauseButton = document.getElementById('pause-button'); // New
+        const resumeButton = document.getElementById('resume-button'); // New
         const statusMessage = document.getElementById('status-message');
+        const charCount = document.getElementById('char-count'); // New
         
         let voices = [];
 
@@ -173,7 +207,7 @@
         // --- Speech Synthesis Function ---
         function speak() {
             if (synth.speaking) {
-                synth.cancel(); // Stop any current speech
+                synth.cancel(); // Stop any current speech before starting a new one
             }
 
             const text = textInput.value.trim();
@@ -192,21 +226,28 @@
             utterance.rate = parseFloat(rateRange.value);
             utterance.pitch = parseFloat(pitchRange.value);
 
-            // Event listeners for status updates
+            // Event listeners for status updates (Updated for Pause/Resume)
             utterance.onstart = () => {
                 listenButton.textContent = '... Speaking';
                 listenButton.disabled = true;
+                pauseButton.disabled = false; // Enable Pause when speaking
+                resumeButton.disabled = true; // Ensure Resume is disabled
             };
             
             utterance.onend = () => {
                 listenButton.textContent = '🔊 Listen';
                 listenButton.disabled = false;
+                pauseButton.disabled = true; // Disable Pause/Resume when finished
+                resumeButton.disabled = true;
             };
 
             utterance.onerror = (event) => {
                 listenButton.textContent = '🔊 Listen';
                 listenButton.disabled = false;
+                pauseButton.disabled = true; 
+                resumeButton.disabled = true;
                 statusMessage.textContent = `❌ Speech error: ${event.error}`;
+                console.error('Speech synthesis error:', event.error);
             };
             
             synth.speak(utterance);
@@ -215,6 +256,29 @@
         // --- Event Listeners ---
         listenButton.addEventListener('click', speak);
 
+        // Feature 1: Pause and Resume Handlers
+        pauseButton.addEventListener('click', () => {
+            if (synth.speaking && !synth.paused) {
+                synth.pause();
+                pauseButton.disabled = true;
+                resumeButton.disabled = false;
+            }
+        });
+
+        resumeButton.addEventListener('click', () => {
+            if (synth.paused) {
+                synth.resume();
+                resumeButton.disabled = true;
+                pauseButton.disabled = false;
+            }
+        });
+        
+        // Feature 2: Character Counter Handler
+        textInput.addEventListener('input', () => {
+            charCount.textContent = textInput.value.length;
+        });
+
+        // Initialize display values and call counter once on load
         rateRange.addEventListener('input', () => {
             rateValue.textContent = rateRange.value;
         });
@@ -230,6 +294,9 @@
                 speak();
             }
         });
+        
+        // Set initial character count
+        textInput.dispatchEvent(new Event('input')); 
 
     </script>
 </body>
